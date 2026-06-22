@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Live Property Editor v1.0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  
+  <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+    :root {
+      --bg:        #f3f4f6;      
+      --surface:   #ffffff;      
+      --surface2:  #e5e7eb;      
+      --border:    #d1d5db;      
+      --ink:       #111827;      
+      --muted:     #6b7280;      
+      --blue:      #1d4ed8;      
+      --blue-dim:  #dbeafe;
+      --green:     #166534;      
+      --green-dim: #dcfce7;
+      --red:       #b91c1c;
+      --red-dim:   #fee2e2;
+      
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Syne', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg); color: var(--ink); font-family: var(--sans);
+      height: 100%; margin: 0; padding: 0;
+      display: flex; flex-direction: column; overflow: hidden;
+      min-width: 380px; 
+    }
+
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; 
+    }
+
+    .header-title { flex: 1; min-width: 150px; }
+    .header-title h1 { font-size: 16px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+    .header-title h1 .version { font-family: var(--mono); font-size: 11px; font-weight: normal; color: var(--muted); background: var(--bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
+    .header-title p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+    .badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+
+    .btn { font-family: var(--sans); font-size: 11px; font-weight: 700; padding: 7px 10px; border-radius: 6px; border: none; cursor: pointer; transition: opacity .15s, transform .1s; white-space: nowrap; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn:not(:disabled):hover { opacity: .85; }
+    .btn:not(:disabled):active { transform: scale(.97); }
+    
+    .btn-primary { background: var(--blue); color: #ffffff; }
+    .btn-success { background: var(--green); color: #ffffff; }
+    .btn-danger { background: var(--surface2); color: var(--red); border: 1px solid var(--border); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); }
+    .btn-outline:hover:not(:disabled) { background: var(--surface2); }
+    .btn-sm { padding: 4px 8px; font-size: 10px; }
+
+    #editPanel { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    
+    #statusBar { font-family: var(--mono); font-size: 11px; padding: 6px 16px; background: var(--blue-dim); color: var(--blue); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #statusBar.ok    { background: var(--green-dim); color: var(--green); }
+    #statusBar.error { background: var(--red-dim);   color: var(--red); }
+    #statusBar.warn  { background: #fef08a; color: #854d0e; }
+
+    main { flex: 1 1 auto; overflow-y: auto; padding: 16px; height: 0; position: relative; }
+    .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+
+    /* PSET STYLING */
+    .pset-group { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .pset-summary { background: var(--surface2); padding: 8px 12px; font-weight: bold; font-size: 12px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; outline: none; }
+    .pset-summary::-webkit-details-marker { display: none; }
+    .pset-summary-title { display: flex; align-items: center; gap: 8px; }
+    .pset-summary-title::before { content: '▼'; font-size: 10px; color: var(--muted); }
+    details[open] .pset-summary-title::before { content: '▲'; }
+    .pset-content { padding: 12px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+    .modal-form-group { display: flex; flex-direction: column; }
+    .modal-form-group label { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--ink); }
+    .input-field { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; transition: border-color 0.2s; }
+    .input-field:focus { outline: none; border-color: var(--blue); }
+    
+    .header-actions { display: flex; gap: 8px; margin-left: auto; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <h1>Live Property Editor <span class="version">v1.0</span></h1>
+    <p>Sanntidsredigering av egendefinerte egenskaper</p>
+  </div>
+  <span class="badge" id="modelBadge">Frakoblet</span>
+</header>
+
+<div id="editPanel">
+  <div style="font-size: 12px; font-weight: bold; color: var(--ink);">
+    <span id="selectionCount">0</span> objekter markert
+  </div>
+  <div style="flex-grow: 1;"></div>
+  <button class="btn btn-primary" id="queueBtn" disabled>💾 Legg endringer i kø</button>
+  <button class="btn btn-danger" id="clearBtn" disabled>Tøm kø</button>
+  <button class="btn btn-success" id="exportBtn" disabled>💾 Eksporter (0)</button>
+</div>
+
+<div id="statusBar">Kobler til Trimble Connect...</div>
+
+<main id="mainContent">
+  <div class="empty anim">Marker objekter i 3D-modellen for å se og redigere egenskaper.</div>
+</main>
+
+<script>
+let API = null;
+let EXPORT_QUEUE = [];
+let currentSelectionTargets = []; // {modelId, runtimeId, guid}
+
+// Kjente system-psets og verdier vi ønsker å skjule
+const SYSTEM_PSETS = [
+    'calculatedgeometryvalues', 'orientedboundingbox', 'reference object', 
+    'common', 'quantities', 'trimble', 'location', 'ifcslab', 'ifcwall', 
+    'ifcalignment', 'ifcbuildingelementproxy', 'ifcproject', 'ifcsite', 'ifcbuilding'
+];
+
+const $ = id => document.getElementById(id);
+const setStatus = (m, c='') => { $('statusBar').textContent = m; $('statusBar').className = c; };
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function naturligSortering(a, b) {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function erEgendefinertPset(psetNavn) {
+    if (!psetNavn) return false;
+    const navnLower = psetNavn.trim().toLowerCase();
+    if (navnLower.startsWith('ifc')) return false; // Skjuler standard IFC psets
+    if (SYSTEM_PSETS.includes(navnLower)) return false;
+    return true;
+}
+
+async function connect(){
+  try {
+    API = await window.TrimbleConnectWorkspace.connect(window.parent);
+    $('modelBadge').textContent = 'Tilkoblet';
+    setStatus('✅ Klar. Marker objekter i 3D for å begynne.', 'ok');
+    
+    // LIVE EVENT LISTENER FOR MARKERING
+    if (API.viewer.onSelectionChanged) {
+        API.viewer.onSelectionChanged(async (selection) => {
+            await handleSelection(selection);
+        });
+    }
+  } catch(e) { 
+    setStatus('❌ Kunne ikke koble til API.', 'error'); 
+  }
+}
+
+async function handleSelection(selection) {
+    if (!selection || selection.length === 0) {
+        $('mainContent').innerHTML = '<div class="empty anim">Marker objekter i 3D-modellen for å se og redigere egenskaper.</div>';
+        $('selectionCount').innerText = "0";
+        $('queueBtn').disabled = true;
+        currentSelectionTargets = [];
+        return;
+    }
+
+    setStatus('⏳ Henter og sammenstiller egenskaper...');
+    $('mainContent').innerHTML = '<div class="empty anim">Henter egenskaper fra markering...</div>';
+
+    currentSelectionTargets = [];
+    let aggregatedPsets = {}; // { psetName: { propName: Set(values) } }
+
+    try {
+        for (const sel of selection) {
+            if (!sel.objectRuntimeIds || sel.objectRuntimeIds.length === 0) continue;
+            
+            // Hent egenskaper for gjeldende markering
+            const propsArr = await API.viewer.getObjectProperties(sel.modelId, sel.objectRuntimeIds);
+
+            propsArr.forEach((obj, idx) => {
+                const rid = obj.id || obj.objectRuntimeId || sel.objectRuntimeIds[idx];
+                let globalId = "UKJENT_GUID";
+                
+                // Forsøk å finne GlobalID for eksport-referanse
+                if (obj.properties) {
+                    obj.properties.forEach(pset => {
+                        (pset.properties || []).forEach(p => {
+                            if(p.name && (p.name.toLowerCase() === 'globalid' || p.name.toLowerCase() === 'ifcguid')) {
+                                globalId = String(p.value);
+                            }
+                        });
+                    });
+                }
+
+                currentSelectionTargets.push({ modelId: sel.modelId, runtimeId: rid, guid: globalId });
+
+                // Aggreger egenskaper
+                (obj.properties || []).forEach(pset => {
+                    if (erEgendefinertPset(pset.name)) {
+                        const pName = pset.name.trim();
+                        if (!aggregatedPsets[pName]) aggregatedPsets[pName] = {};
+
+                        (pset.properties || []).forEach(p => {
+                            if (p.name) {
+                                const propName = p.name.trim();
+                                const valStr = p.value !== undefined && p.value !== null ? String(p.value).trim() : "";
+                                if (!aggregatedPsets[pName][propName]) aggregatedPsets[pName][propName] = new Set();
+                                aggregatedPsets[pName][propName].add(valStr);
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        $('selectionCount').innerText = currentSelectionTargets.length;
+        $('queueBtn').disabled = false;
+        renderProperties(aggregatedPsets);
+        setStatus(`✅ Hentet egenskaper for ${currentSelectionTargets.length} objekter.`, 'ok');
+
+    } catch (e) {
+        console.error(e);
+        setStatus('❌ Feil ved henting av egenskaper.', 'error');
+    }
+}
+
+function renderProperties(aggregatedPsets) {
+    let html = '';
+    const psetKeys = Object.keys(aggregatedPsets).sort(naturligSortering);
+
+    if (psetKeys.length === 0) {
+        html = '<div class="empty anim">Fant ingen egendefinerte egenskapssett på de markerte objektene.</div>';
+    } else {
+        psetKeys.forEach(psetName => {
+            html += `<details class="pset-group" open>
+                        <summary class="pset-summary">
+                            <span class="pset-summary-title">${escapeHTML(psetName)}</span>
+                            <button class="btn btn-outline btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Legg til egenskap</button>
+                        </summary>
+                        <div class="pset-content" id="pset-content-${escapeHTML(psetName)}">`;
+
+            const propKeys = Object.keys(aggregatedPsets[psetName]).sort(naturligSortering);
+            propKeys.forEach(prop => {
+                const valSet = aggregatedPsets[psetName][prop];
+                const isSame = valSet.size === 1;
+                const firstVal = isSame ? Array.from(valSet)[0] : "";
+                
+                const displayVal = isSame ? escapeHTML(firstVal) : "";
+                const originalVal = isSame ? escapeHTML(firstVal) : "__MIXED__";
+                const placeholder = isSame ? "" : "Ulike verdier... Skriv her for å overskrive alle";
+
+                html += `<div class="modal-form-group">
+                            <label>${escapeHTML(prop)}</label>
+                            <input type="text" class="input-field prop-input" data-pset="${escapeHTML(psetName)}" data-prop="${escapeHTML(prop)}" data-original="${originalVal}" value="${displayVal}" placeholder="${placeholder}">
+                         </div>`;
+            });
+
+            html += `</div></details>`;
+        });
+    }
+
+    // Skjema for å opprette et helt nytt Pset i bunnen
+    html += `<div style="margin-top:20px; padding:16px; background:var(--surface2); border:1px dashed var(--border); border-radius:6px;">
+                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:8px; color:var(--ink);">➕ Opprett nytt Egenskapssett</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="newPsetName" class="input-field" style="flex:1;" placeholder="Navn på nytt Pset (f.eks: 0_Element)">
+                    <button class="btn btn-success" onclick="opprettNyttPset()">Opprett</button>
+                </div>
+            </div>`;
+
+    $('mainContent').innerHTML = html;
+}
+
+// UI Funksjoner for dynamisk innhold
+window.leggTilNyEgenskapRad = function(e, psetName) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const container = document.getElementById(`pset-content-${psetName}`);
+    const div = document.createElement('div');
+    div.className = 'modal-form-group new-prop-row';
+    div.innerHTML = `
+        <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" class="input-field prop-name-input" placeholder="Egenskapsnavn" style="flex:1; border-color: var(--blue);">
+            <input type="text" class="input-field prop-val-input" placeholder="Verdi" style="flex:1; border-color: var(--blue);">
+            <button class="btn btn-success btn-sm" onclick="bekreftNyEgenskap(this, '${escapeHTML(psetName)}')">OK</button>
+        </div>
+    `;
+    container.appendChild(div);
+};
+
+window.bekreftNyEgenskap = function(btn, psetName) {
+    const row = btn.parentElement.parentElement;
+    const nameInput = row.querySelector('.prop-name-input').value.trim();
+    const valInput = row.querySelector('.prop-val-input').value.trim();
+
+    if(!nameInput) { alert("Egenskapen må ha et navn."); return; }
+
+    // Gjør om raden til et standard input-felt som plukkes opp av eksporten
+    row.innerHTML = `
+        <label>${escapeHTML(nameInput)} <span class="badge" style="color:var(--blue); border-color:var(--blue);">Ny</span></label>
+        <input type="text" class="input-field prop-input" data-pset="${escapeHTML(psetName)}" data-prop="${escapeHTML(nameInput)}" data-original="__NEW__" value="${escapeHTML(valInput)}" style="border-color:var(--blue);">
+    `;
+    row.classList.remove('new-prop-row');
+};
+
+window.opprettNyttPset = function() {
+    const psetName = $('newPsetName').value.trim();
+    if(!psetName) { alert("Du må skrive inn et navn på Egenskapssettet."); return; }
+
+    // Sjekk om det eksisterer allerede i UI
+    if(document.getElementById(`pset-content-${psetName}`)) {
+        alert("Dette Egenskapssettet vises allerede over.");
+        return;
+    }
+
+    const html = `<details class="pset-group" open style="border-color:var(--blue);">
+                    <summary class="pset-summary" style="background:var(--blue-dim); color:var(--blue);">
+                        <span class="pset-summary-title">${escapeHTML(psetName)}</span>
+                        <button class="btn btn-primary btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Legg til egenskap</button>
+                    </summary>
+                    <div class="pset-content" id="pset-content-${escapeHTML(psetName)}">
+                        <div style="font-size:11px; color:var(--muted); font-style:italic;">Klikk "Legg til egenskap" over for å fylle dette settet.</div>
+                    </div>
+                  </details>`;
+
+    // Sett inn over "Nytt Pset"-boksen
+    const newDiv = document.createElement('div');
+    newDiv.innerHTML = html;
+    $('mainContent').insertBefore(newDiv.firstChild, $('mainContent').lastElementChild);
+    $('newPsetName').value = "";
+};
+
+// KØ OG EKSPORT
+function oppdaterUI() {
+    const antall = EXPORT_QUEUE.length;
+    $('exportBtn').innerText = `💾 Eksporter (${antall})`;
+    $('exportBtn').disabled = antall === 0;
+    $('clearBtn').disabled = antall === 0;
+}
+
+$('queueBtn').addEventListener('click', () => {
+    const inputs = document.querySelectorAll('.prop-input');
+    const plannedChanges = {}; // Struktur: { PsetName: { PropName: Verdi } }
+
+    inputs.forEach(inp => {
+        const pset = inp.getAttribute('data-pset');
+        const prop = inp.getAttribute('data-prop');
+        const orig = inp.getAttribute('data-original');
+        const val = inp.value.trim();
+
+        if (orig === "__MIXED__" || orig === "__NEW__") {
+            if (val !== "") { 
+                if(!plannedChanges[pset]) plannedChanges[pset] = {};
+                plannedChanges[pset][prop] = val; 
+            }
+        } else if (val !== orig) {
+            if(!plannedChanges[pset]) plannedChanges[pset] = {};
+            plannedChanges[pset][prop] = val;
+        }
+    });
+
+    if (Object.keys(plannedChanges).length === 0) {
+        alert("Ingen endringer ble registrert i skjemaet.");
+        return;
+    }
+
+    // Legg til / oppdater i køen
+    currentSelectionTargets.forEach(target => {
+        // Fjern evt tidligere kø-innslag for samme objekt
+        EXPORT_QUEUE = EXPORT_QUEUE.filter(item => !(item.modelId === target.modelId && item.runtimeId === target.runtimeId));
+        
+        const updateItem = {
+            GUID: target.guid,
+            modelId: target.modelId,
+            runtimeId: target.runtimeId,
+            egenskaperSomSkalEndres: plannedChanges
+        };
+        
+        EXPORT_QUEUE.push(updateItem);
+    });
+
+    oppdaterUI();
+    
+    // Visuell bekreftelse i input-feltene
+    inputs.forEach(inp => {
+        if(inp.value !== inp.getAttribute('data-original') && inp.value !== "") {
+            inp.style.backgroundColor = "var(--green-dim)";
+            setTimeout(() => { inp.style.backgroundColor = ""; }, 1000);
+        }
+    });
+
+    setStatus(`✅ Lagret endringer for ${currentSelectionTargets.length} objekter i eksport-køen.`, 'ok');
+});
+
+$('clearBtn').addEventListener('click', () => {
+    EXPORT_QUEUE = [];
+    oppdaterUI();
+    setStatus('🗑️ Køen er tømt.', 'ok');
+});
+
+$('exportBtn').addEventListener('click', () => {
+    if (EXPORT_QUEUE.length === 0) return;
+    try {
+        const jsonString = JSON.stringify(EXPORT_QUEUE, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `property_batch_update.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        
+        const antallEksportert = EXPORT_QUEUE.length;
+        EXPORT_QUEUE = [];
+        oppdaterUI();
+        
+        setStatus(`🎉 Eksporterte JSON med endringer for ${antallEksportert} objekter. Køen er tømt.`, 'ok');
+    } catch (error) { setStatus(`❌ Feil under eksport: ${error.message}`, 'error'); }
+});
+
+// Start
+connect();
+</script>
+</body>
+</html>
