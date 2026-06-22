@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Live Property Editor v1.0</title>
+  <title>Live Property Editor v1.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -76,7 +76,7 @@
     .pset-summary { background: var(--surface2); padding: 8px 12px; font-weight: bold; font-size: 12px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; outline: none; }
     .pset-summary::-webkit-details-marker { display: none; }
     .pset-summary-title { display: flex; align-items: center; gap: 8px; }
-    .pset-summary-title::before { content: '▼'; font-size: 10px; color: var(--muted); }
+    .pset-summary-title::before { content: '▼'; font-size: 10px; color: var(--muted); margin-right: 6px; }
     details[open] .pset-summary-title::before { content: '▲'; }
     .pset-content { padding: 12px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 
@@ -97,7 +97,7 @@
 
 <header>
   <div class="header-title">
-    <h1>Live Property Editor <span class="version">v1.0</span></h1>
+    <h1>Live Property Editor <span class="version">v1.1</span></h1>
     <p>Sanntidsredigering av egendefinerte egenskaper</p>
   </div>
   <span class="badge" id="modelBadge">Frakoblet</span>
@@ -122,7 +122,8 @@
 <script>
 let API = null;
 let EXPORT_QUEUE = [];
-let currentSelectionTargets = []; // {modelId, runtimeId, guid}
+let currentSelectionTargets = []; 
+let lastSelectionSignature = "";
 
 // Kjente system-psets og verdier vi ønsker å skjule
 const SYSTEM_PSETS = [
@@ -146,30 +147,68 @@ function naturligSortering(a, b) {
 function erEgendefinertPset(psetNavn) {
     if (!psetNavn) return false;
     const navnLower = psetNavn.trim().toLowerCase();
-    if (navnLower.startsWith('ifc')) return false; // Skjuler standard IFC psets
+    if (navnLower.startsWith('ifc')) return false; 
     if (SYSTEM_PSETS.includes(navnLower)) return false;
     return true;
+}
+
+function getSelectionSignature(selectionArray) {
+    const safeSet = new Set();
+    if (!selectionArray || !selectionArray.length) return "";
+    selectionArray.forEach(sel => {
+        const mid = String(sel.modelId || sel.modelid || sel.id || "unknown");
+        const rids = sel.objectRuntimeIds || sel.objectRuntimeids || sel.objects || [];
+        rids.forEach(rid => {
+            const cleanRid = String((typeof rid === 'object' && rid !== null) ? (rid.id || rid.objectRuntimeId) : rid);
+            safeSet.add(`${mid}_${cleanRid}`);
+        });
+    });
+    return Array.from(safeSet).sort().join(',');
 }
 
 async function connect(){
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
     $('modelBadge').textContent = 'Tilkoblet';
-    setStatus('✅ Klar. Marker objekter i 3D for å begynne.', 'ok');
+    setStatus('✅ Klar. Skanner aktivitet i 3D...', 'ok');
     
-    // LIVE EVENT LISTENER FOR MARKERING
-    if (API.viewer.onSelectionChanged) {
-        API.viewer.onSelectionChanged(async (selection) => {
-            await handleSelection(selection);
-        });
-    }
+    // GJENOPPRETTET LIVE-SKANNER (POLLING) FRA RDS-EDITOREN
+    setInterval(async () => {
+        if (!API || !API.viewer) return;
+        try {
+            const selection = await API.viewer.getSelection();
+            const sig = getSelectionSignature(selection);
+            if (sig !== lastSelectionSignature) {
+                lastSelectionSignature = sig;
+                await handleSelection(selection);
+            }
+        } catch(e) {}
+    }, 400);
+
   } catch(e) { 
     setStatus('❌ Kunne ikke koble til API.', 'error'); 
   }
 }
 
 async function handleSelection(selection) {
-    if (!selection || selection.length === 0) {
+    // Normaliser og rens markeringen for å takle ulik API-syntaks
+    const normalizedSelection = [];
+    if (selection && selection.length > 0) {
+        selection.forEach(sel => {
+            const mid = String(sel.modelId || sel.modelid || sel.id || "unknown");
+            const rids = sel.objectRuntimeIds || sel.objectRuntimeids || sel.objects || [];
+            const cleanRids = [];
+            rids.forEach(rid => {
+                const cleanRid = (typeof rid === 'object' && rid !== null) ? (rid.id || rid.objectRuntimeId) : rid;
+                if (cleanRid != null) cleanRids.push(Number(cleanRid));
+            });
+            if (cleanRids.length > 0) {
+                normalizedSelection.push({ modelId: mid, objectRuntimeIds: cleanRids });
+            }
+        });
+    }
+
+    if (normalizedSelection.length === 0) {
         $('mainContent').innerHTML = '<div class="empty anim">Marker objekter i 3D-modellen for å se og redigere egenskaper.</div>';
         $('selectionCount').innerText = "0";
         $('queueBtn').disabled = true;
@@ -181,20 +220,16 @@ async function handleSelection(selection) {
     $('mainContent').innerHTML = '<div class="empty anim">Henter egenskaper fra markering...</div>';
 
     currentSelectionTargets = [];
-    let aggregatedPsets = {}; // { psetName: { propName: Set(values) } }
+    let aggregatedPsets = {}; 
 
     try {
-        for (const sel of selection) {
-            if (!sel.objectRuntimeIds || sel.objectRuntimeIds.length === 0) continue;
-            
-            // Hent egenskaper for gjeldende markering
+        for (const sel of normalizedSelection) {
             const propsArr = await API.viewer.getObjectProperties(sel.modelId, sel.objectRuntimeIds);
 
             propsArr.forEach((obj, idx) => {
                 const rid = obj.id || obj.objectRuntimeId || sel.objectRuntimeIds[idx];
                 let globalId = "UKJENT_GUID";
                 
-                // Forsøk å finne GlobalID for eksport-referanse
                 if (obj.properties) {
                     obj.properties.forEach(pset => {
                         (pset.properties || []).forEach(p => {
@@ -207,7 +242,6 @@ async function handleSelection(selection) {
 
                 currentSelectionTargets.push({ modelId: sel.modelId, runtimeId: rid, guid: globalId });
 
-                // Aggreger egenskaper
                 (obj.properties || []).forEach(pset => {
                     if (erEgendefinertPset(pset.name)) {
                         const pName = pset.name.trim();
@@ -229,7 +263,7 @@ async function handleSelection(selection) {
         $('selectionCount').innerText = currentSelectionTargets.length;
         $('queueBtn').disabled = false;
         renderProperties(aggregatedPsets);
-        setStatus(`✅ Hentet egenskaper for ${currentSelectionTargets.length} objekter.`, 'ok');
+        setStatus(`✅ Viser egenskaper for ${currentSelectionTargets.length} objekter.`, 'ok');
 
     } catch (e) {
         console.error(e);
@@ -272,7 +306,6 @@ function renderProperties(aggregatedPsets) {
         });
     }
 
-    // Skjema for å opprette et helt nytt Pset i bunnen
     html += `<div style="margin-top:20px; padding:16px; background:var(--surface2); border:1px dashed var(--border); border-radius:6px;">
                 <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:8px; color:var(--ink);">➕ Opprett nytt Egenskapssett</label>
                 <div style="display:flex; gap:8px;">
@@ -284,7 +317,6 @@ function renderProperties(aggregatedPsets) {
     $('mainContent').innerHTML = html;
 }
 
-// UI Funksjoner for dynamisk innhold
 window.leggTilNyEgenskapRad = function(e, psetName) {
     e.preventDefault();
     e.stopPropagation();
@@ -293,7 +325,7 @@ window.leggTilNyEgenskapRad = function(e, psetName) {
     const div = document.createElement('div');
     div.className = 'modal-form-group new-prop-row';
     div.innerHTML = `
-        <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
             <input type="text" class="input-field prop-name-input" placeholder="Egenskapsnavn" style="flex:1; border-color: var(--blue);">
             <input type="text" class="input-field prop-val-input" placeholder="Verdi" style="flex:1; border-color: var(--blue);">
             <button class="btn btn-success btn-sm" onclick="bekreftNyEgenskap(this, '${escapeHTML(psetName)}')">OK</button>
@@ -309,9 +341,8 @@ window.bekreftNyEgenskap = function(btn, psetName) {
 
     if(!nameInput) { alert("Egenskapen må ha et navn."); return; }
 
-    // Gjør om raden til et standard input-felt som plukkes opp av eksporten
     row.innerHTML = `
-        <label>${escapeHTML(nameInput)} <span class="badge" style="color:var(--blue); border-color:var(--blue);">Ny</span></label>
+        <label>${escapeHTML(nameInput)} <span class="badge" style="color:var(--blue); border-color:var(--blue); padding:1px 4px; font-size:9px;">Ny</span></label>
         <input type="text" class="input-field prop-input" data-pset="${escapeHTML(psetName)}" data-prop="${escapeHTML(nameInput)}" data-original="__NEW__" value="${escapeHTML(valInput)}" style="border-color:var(--blue);">
     `;
     row.classList.remove('new-prop-row');
@@ -321,7 +352,6 @@ window.opprettNyttPset = function() {
     const psetName = $('newPsetName').value.trim();
     if(!psetName) { alert("Du må skrive inn et navn på Egenskapssettet."); return; }
 
-    // Sjekk om det eksisterer allerede i UI
     if(document.getElementById(`pset-content-${psetName}`)) {
         alert("Dette Egenskapssettet vises allerede over.");
         return;
@@ -337,14 +367,12 @@ window.opprettNyttPset = function() {
                     </div>
                   </details>`;
 
-    // Sett inn over "Nytt Pset"-boksen
     const newDiv = document.createElement('div');
     newDiv.innerHTML = html;
     $('mainContent').insertBefore(newDiv.firstChild, $('mainContent').lastElementChild);
     $('newPsetName').value = "";
 };
 
-// KØ OG EKSPORT
 function oppdaterUI() {
     const antall = EXPORT_QUEUE.length;
     $('exportBtn').innerText = `💾 Eksporter (${antall})`;
@@ -354,7 +382,7 @@ function oppdaterUI() {
 
 $('queueBtn').addEventListener('click', () => {
     const inputs = document.querySelectorAll('.prop-input');
-    const plannedChanges = {}; // Struktur: { PsetName: { PropName: Verdi } }
+    const plannedChanges = {}; 
 
     inputs.forEach(inp => {
         const pset = inp.getAttribute('data-pset');
@@ -378,9 +406,7 @@ $('queueBtn').addEventListener('click', () => {
         return;
     }
 
-    // Legg til / oppdater i køen
     currentSelectionTargets.forEach(target => {
-        // Fjern evt tidligere kø-innslag for samme objekt
         EXPORT_QUEUE = EXPORT_QUEUE.filter(item => !(item.modelId === target.modelId && item.runtimeId === target.runtimeId));
         
         const updateItem = {
@@ -395,7 +421,6 @@ $('queueBtn').addEventListener('click', () => {
 
     oppdaterUI();
     
-    // Visuell bekreftelse i input-feltene
     inputs.forEach(inp => {
         if(inp.value !== inp.getAttribute('data-original') && inp.value !== "") {
             inp.style.backgroundColor = "var(--green-dim)";
@@ -430,7 +455,6 @@ $('exportBtn').addEventListener('click', () => {
     } catch (error) { setStatus(`❌ Feil under eksport: ${error.message}`, 'error'); }
 });
 
-// Start
 connect();
 </script>
 </body>
