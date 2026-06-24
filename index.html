@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Live Property Editor v1.1</title>
+  <title>Live Property Editor v1.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -17,7 +17,7 @@
       --border:    #d1d5db;      
       --ink:       #111827;      
       --muted:     #6b7280;      
-      --blue:      #1d4ed8;      
+      --blue:      #0050b5;      
       --blue-dim:  #dbeafe;
       --green:     #166534;      
       --green-dim: #dcfce7;
@@ -28,7 +28,7 @@
       --bad:       #d92d20;
       
       --mono:      'JetBrains Mono', monospace;
-      --sans:      'Syne', sans-serif;
+      --sans:      system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,10 +37,10 @@
       background: var(--bg); color: var(--ink); font-family: var(--sans);
       height: 100%; margin: 0; padding: 0;
       display: flex; flex-direction: column; overflow: hidden;
-      min-width: 380px; 
+      min-width: 380px; user-select: none;
     }
 
-    /* --- NY HEADER STYLING --- */
+    /* --- NORCONSULT HEADER STYLING --- */
     .topbar {
       height: 92px; background: #fff; border-bottom: 1px solid var(--border);
       display: flex; align-items: center; gap: 18px; padding: 10px 18px; flex: 0 0 auto;
@@ -51,54 +51,57 @@
       box-shadow: 0 4px 14px rgba(16,24,40,.08); overflow: hidden; flex-shrink: 0;
     }
     .logo-card img { max-width: 128px; max-height: 50px; object-fit: contain; }
-    .app-title { display: flex; flex-direction: column; line-height: 1.2; }
-    .app-title b { font-size: 18px; color: #0050b5; }
-    .app-title span { font-size: 14px; font-weight: 600; }
-    .app-title em { font-size: 12px; color: #667085; font-style: normal; }
     
-    .status { margin-left: auto; display: flex; align-items: center; gap: 7px; color: #667085; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .app-title { display: flex; flex-direction: column; line-height: 1.2; }
+    .app-title b { font-size: 18px; color: var(--blue); }
+    .app-title span { font-size: 14px; font-weight: 600; }
+    .app-title em { font-size: 12px; color: var(--muted); font-style: normal; }
+    
+    .status { margin-left: auto; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; flex-shrink: 0; }
     .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
     .dot.warn { background: var(--warn); }
     .dot.error { background: var(--bad); }
 
-    .badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--blue); background: var(--blue-dim); white-space: nowrap; }
+    .badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); color: #1d4ed8; background: var(--blue-dim); white-space: nowrap; }
 
-    .btn { font-family: var(--sans); font-size: 11px; font-weight: 700; padding: 7px 10px; border-radius: 6px; border: none; cursor: pointer; transition: opacity .15s, transform .1s; white-space: nowrap; }
+    .btn { font-family: var(--sans); font-size: 12px; font-weight: 800; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: opacity .15s, transform .1s, background .15s; white-space: nowrap; }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
     .btn:not(:disabled):hover { opacity: .85; }
     .btn:not(:disabled):active { transform: scale(.97); }
     
-    .btn-primary { background: var(--blue); color: #ffffff; }
-    .btn-success { background: var(--green); color: #ffffff; }
-    .btn-danger { background: var(--surface2); color: var(--red); border: 1px solid var(--border); }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); }
+    .btn-primary { background: var(--blue); color: #ffffff; border-color: var(--blue); }
+    .btn-success { background: var(--ok); color: #ffffff; border-color: var(--ok); }
+    .btn-danger { background: #fff; color: var(--bad); border-color: var(--border); }
+    .btn-danger:hover:not(:disabled) { background: var(--red-dim); }
+    .btn-outline { background: #fff; color: var(--ink); }
     .btn-outline:hover:not(:disabled) { background: var(--surface2); }
     .btn-sm { padding: 4px 8px; font-size: 10px; }
 
-    #editPanel { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    #editPanel { background: #fff; border-bottom: 1px solid var(--border); padding: 10px 18px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.02); z-index: 10;}
     
     main { flex: 1 1 auto; overflow-y: auto; padding: 16px; height: 0; position: relative; }
     .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
 
     /* PSET STYLING */
-    .pset-group { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .pset-summary { background: var(--surface2); padding: 8px 12px; font-weight: bold; font-size: 12px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; outline: none; }
+    .pset-group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; background: var(--surface); box-shadow: 0 2px 4px rgba(16,24,40,.04); }
+    .pset-summary { background: #f9fafb; padding: 10px 14px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; outline: none; transition: background 0.2s; }
+    .pset-summary:hover { background: var(--surface2); }
     .pset-summary::-webkit-details-marker { display: none; }
     .pset-summary-title { display: flex; align-items: center; gap: 8px; }
     .pset-summary-title::before { content: '▼'; font-size: 10px; color: var(--muted); margin-right: 6px; }
     details[open] .pset-summary-title::before { content: '▲'; }
-    .pset-content { padding: 12px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    .pset-content { padding: 14px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
 
     .modal-form-group { display: flex; flex-direction: column; }
-    .modal-form-group label { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-bottom: 4px; color: var(--ink); }
-    .input-field { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; transition: border-color 0.2s; }
-    .input-field:focus { outline: none; border-color: var(--blue); }
+    .modal-form-group label { display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; margin-bottom: 4px; color: var(--muted); }
+    .input-field { font-family: var(--mono); font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; transition: border-color 0.2s, box-shadow 0.2s; }
+    .input-field:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-dim); }
 
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--ink); }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
     @media(max-width:760px) {
       .topbar { height: auto; padding: 8px; flex-wrap: wrap; }
@@ -113,10 +116,11 @@
 
 <header class="topbar">
   <div class="logo-card">
+    <!-- Bruker lokalt bilde via relativ bane slik du ba om -->
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Live Property Editor v1.1</b>
+    <b>Live Property Editor v1.2</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult, AI-assisted development. Kontaktperson: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -127,8 +131,8 @@
 </header>
 
 <div id="editPanel">
-  <div style="font-size: 12px; font-weight: bold; color: var(--ink);">
-    <span id="selectionCount">0</span> objekter markert
+  <div style="font-size: 12px; font-weight: 800; color: var(--ink);">
+    <span id="selectionCount" style="color:var(--blue); font-size: 14px;">0</span> objekter markert
   </div>
   <div style="flex-grow: 1;"></div>
   <button class="btn btn-primary" id="queueBtn" disabled>💾 Legg endringer i kø</button>
@@ -146,7 +150,7 @@ let EXPORT_QUEUE = [];
 let currentSelectionTargets = []; 
 let lastSelectionSignature = "";
 
-// Kjente system-psets og verdier vi ønsker å skjule
+// Kjente system-psets og verdier vi ønsker å skjule for å holde UI rent
 const SYSTEM_PSETS = [
     'calculatedgeometryvalues', 'orientedboundingbox', 'reference object', 
     'common', 'quantities', 'trimble', 'location', 'ifcslab', 'ifcwall', 
@@ -155,7 +159,7 @@ const SYSTEM_PSETS = [
 
 const $ = id => document.getElementById(id);
 
-// Ny setStatus-funksjon som styrer statuslinjen i den nye headeren
+// UI Status oppdaterer
 const setStatus = (m, c='') => { 
     $('statusText').textContent = m; 
     let dotClass = 'dot';
@@ -199,8 +203,9 @@ function getSelectionSignature(selectionArray) {
 async function connect(){
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
-    setStatus('✅ Klar. Skanner aktivitet i 3D...', 'ok');
+    setStatus('Klar. Skanner 3D-modell...', 'ok');
     
+    // Asynkron polling for å fange opp markering (Live-funksjon)
     setInterval(async () => {
         if (!API || !API.viewer) return;
         try {
@@ -214,12 +219,12 @@ async function connect(){
     }, 400);
 
   } catch(e) { 
-    setStatus('❌ Kunne ikke koble til API.', 'error'); 
+    setStatus('Kunne ikke koble til API', 'error'); 
   }
 }
 
 async function handleSelection(selection) {
-    // Normaliser og rens markeringen for å takle ulik API-syntaks
+    // Normaliser API markering
     const normalizedSelection = [];
     if (selection && selection.length > 0) {
         selection.forEach(sel => {
@@ -244,8 +249,8 @@ async function handleSelection(selection) {
         return;
     }
 
-    setStatus('⏳ Henter og sammenstiller egenskaper...');
-    $('mainContent').innerHTML = '<div class="empty anim">Henter egenskaper fra markering...</div>';
+    setStatus('Henter egenskaper...', '');
+    $('mainContent').innerHTML = '<div class="empty anim">Sammenstiller egenskaper...</div>';
 
     currentSelectionTargets = [];
     let aggregatedPsets = {}; 
@@ -256,20 +261,48 @@ async function handleSelection(selection) {
 
             propsArr.forEach((obj, idx) => {
                 const rid = obj.id || obj.objectRuntimeId || sel.objectRuntimeIds[idx];
-                let globalId = "UKJENT_GUID";
                 
+                // --- SAMME IDENTIFIKATOR-LOGIKK SOM RDS EDITOR ---
+                let globalId = "UKJENT_GUID";
+                if (obj.externalId) globalId = obj.externalId;
+                else if (obj.globalId) globalId = obj.globalId;
+                else if (obj.ifcGuid) globalId = obj.ifcGuid;
+
+                let gammelRdsTag = "";
+
                 if (obj.properties) {
                     obj.properties.forEach(pset => {
                         (pset.properties || []).forEach(p => {
-                            if(p.name && (p.name.toLowerCase() === 'globalid' || p.name.toLowerCase() === 'ifcguid')) {
-                                globalId = String(p.value);
+                            if (p.name) {
+                                const nameLower = p.name.trim().toLowerCase();
+                                const valStr = p.value !== undefined && p.value !== null ? String(p.value).trim() : "";
+                                
+                                // Hent gammel RDS-tag i tilfelle Python-scriptet krever det
+                                if (nameLower === "01. rds-tag") {
+                                    gammelRdsTag = valStr;
+                                }
+
+                                // Ekstra sjekk for GUID inni properties
+                                if (nameLower.includes("guid") || nameLower.includes("globalid") || nameLower === "objid") {
+                                    if (nameLower.includes("ifc") || nameLower === "globalid" || nameLower === "objid") {
+                                        globalId = valStr;
+                                    } else if (globalId === "UKJENT_GUID") {
+                                        globalId = valStr;
+                                    }
+                                }
                             }
                         });
                     });
                 }
 
-                currentSelectionTargets.push({ modelId: sel.modelId, runtimeId: rid, guid: globalId });
+                currentSelectionTargets.push({ 
+                    modelId: sel.modelId, 
+                    runtimeId: rid, 
+                    guid: globalId,
+                    gammelRdsTag: gammelRdsTag 
+                });
 
+                // Aggreger Properties for UI
                 (obj.properties || []).forEach(pset => {
                     if (erEgendefinertPset(pset.name)) {
                         const pName = pset.name.trim();
@@ -291,11 +324,11 @@ async function handleSelection(selection) {
         $('selectionCount').innerText = currentSelectionTargets.length;
         $('queueBtn').disabled = false;
         renderProperties(aggregatedPsets);
-        setStatus(`✅ Viser egenskaper for ${currentSelectionTargets.length} objekter.`, 'ok');
+        setStatus('Live', 'ok');
 
     } catch (e) {
         console.error(e);
-        setStatus('❌ Feil ved henting av egenskaper.', 'error');
+        setStatus('Feil ved henting', 'error');
     }
 }
 
@@ -310,7 +343,7 @@ function renderProperties(aggregatedPsets) {
             html += `<details class="pset-group" open>
                         <summary class="pset-summary">
                             <span class="pset-summary-title">${escapeHTML(psetName)}</span>
-                            <button class="btn btn-outline btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Legg til egenskap</button>
+                            <button class="btn btn-outline btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Ny egenskap</button>
                         </summary>
                         <div class="pset-content" id="pset-content-${escapeHTML(psetName)}">`;
 
@@ -322,7 +355,7 @@ function renderProperties(aggregatedPsets) {
                 
                 const displayVal = isSame ? escapeHTML(firstVal) : "";
                 const originalVal = isSame ? escapeHTML(firstVal) : "__MIXED__";
-                const placeholder = isSame ? "" : "Ulike verdier... Skriv her for å overskrive alle";
+                const placeholder = isSame ? "" : "Ulike verdier... Skriv for å overskrive alle";
 
                 html += `<div class="modal-form-group">
                             <label>${escapeHTML(prop)}</label>
@@ -334,8 +367,8 @@ function renderProperties(aggregatedPsets) {
         });
     }
 
-    html += `<div style="margin-top:20px; padding:16px; background:var(--surface2); border:1px dashed var(--border); border-radius:6px;">
-                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:8px; color:var(--ink);">➕ Opprett nytt Egenskapssett</label>
+    html += `<div style="margin-top:20px; padding:16px; background:var(--surface2); border:1px dashed var(--border); border-radius:8px;">
+                <label style="display:block; font-size:12px; font-weight:800; margin-bottom:8px; color:var(--ink);">➕ Opprett nytt Egenskapssett</label>
                 <div style="display:flex; gap:8px;">
                     <input type="text" id="newPsetName" class="input-field" style="flex:1;" placeholder="Navn på nytt Pset (f.eks: 0_Element)">
                     <button class="btn btn-success" onclick="opprettNyttPset()">Opprett</button>
@@ -356,7 +389,7 @@ window.leggTilNyEgenskapRad = function(e, psetName) {
         <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
             <input type="text" class="input-field prop-name-input" placeholder="Egenskapsnavn" style="flex:1; border-color: var(--blue);">
             <input type="text" class="input-field prop-val-input" placeholder="Verdi" style="flex:1; border-color: var(--blue);">
-            <button class="btn btn-success btn-sm" onclick="bekreftNyEgenskap(this, '${escapeHTML(psetName)}')">OK</button>
+            <button class="btn btn-primary btn-sm" onclick="bekreftNyEgenskap(this, '${escapeHTML(psetName)}')">Lagre</button>
         </div>
     `;
     container.appendChild(div);
@@ -370,8 +403,8 @@ window.bekreftNyEgenskap = function(btn, psetName) {
     if(!nameInput) { alert("Egenskapen må ha et navn."); return; }
 
     row.innerHTML = `
-        <label>${escapeHTML(nameInput)} <span class="badge" style="color:var(--blue); border-color:var(--blue); padding:1px 4px; font-size:9px;">Ny</span></label>
-        <input type="text" class="input-field prop-input" data-pset="${escapeHTML(psetName)}" data-prop="${escapeHTML(nameInput)}" data-original="__NEW__" value="${escapeHTML(valInput)}" style="border-color:var(--blue);">
+        <label>${escapeHTML(nameInput)} <span class="badge" style="padding:2px 5px; font-size:9px;">Ny egenskap</span></label>
+        <input type="text" class="input-field prop-input" data-pset="${escapeHTML(psetName)}" data-prop="${escapeHTML(nameInput)}" data-original="__NEW__" value="${escapeHTML(valInput)}" style="border-color:var(--blue); background-color: var(--blue-dim);">
     `;
     row.classList.remove('new-prop-row');
 };
@@ -388,10 +421,10 @@ window.opprettNyttPset = function() {
     const html = `<details class="pset-group" open style="border-color:var(--blue);">
                     <summary class="pset-summary" style="background:var(--blue-dim); color:var(--blue);">
                         <span class="pset-summary-title">${escapeHTML(psetName)}</span>
-                        <button class="btn btn-primary btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Legg til egenskap</button>
+                        <button class="btn btn-primary btn-sm" onclick="leggTilNyEgenskapRad(event, '${escapeHTML(psetName)}')">➕ Ny egenskap</button>
                     </summary>
                     <div class="pset-content" id="pset-content-${escapeHTML(psetName)}">
-                        <div style="font-size:11px; color:var(--muted); font-style:italic;">Klikk "Legg til egenskap" over for å fylle dette settet.</div>
+                        <div style="font-size:11px; color:var(--muted); font-style:italic;">Klikk "Ny egenskap" over for å fylle dette settet.</div>
                     </div>
                   </details>`;
 
@@ -410,7 +443,8 @@ function oppdaterUI() {
 
 $('queueBtn').addEventListener('click', () => {
     const inputs = document.querySelectorAll('.prop-input');
-    const plannedChanges = {}; 
+    const flatChanges = {}; 
+    const structuredChanges = {};
 
     inputs.forEach(inp => {
         const pset = inp.getAttribute('data-pset');
@@ -420,16 +454,18 @@ $('queueBtn').addEventListener('click', () => {
 
         if (orig === "__MIXED__" || orig === "__NEW__") {
             if (val !== "") { 
-                if(!plannedChanges[pset]) plannedChanges[pset] = {};
-                plannedChanges[pset][prop] = val; 
+                flatChanges[prop] = val; 
+                if(!structuredChanges[pset]) structuredChanges[pset] = {};
+                structuredChanges[pset][prop] = val;
             }
         } else if (val !== orig) {
-            if(!plannedChanges[pset]) plannedChanges[pset] = {};
-            plannedChanges[pset][prop] = val;
+            flatChanges[prop] = val;
+            if(!structuredChanges[pset]) structuredChanges[pset] = {};
+            structuredChanges[pset][prop] = val;
         }
     });
 
-    if (Object.keys(plannedChanges).length === 0) {
+    if (Object.keys(flatChanges).length === 0) {
         alert("Ingen endringer ble registrert i skjemaet.");
         return;
     }
@@ -437,11 +473,14 @@ $('queueBtn').addEventListener('click', () => {
     currentSelectionTargets.forEach(target => {
         EXPORT_QUEUE = EXPORT_QUEUE.filter(item => !(item.modelId === target.modelId && item.runtimeId === target.runtimeId));
         
+        // --- NØYAKTIG SAMME EKSPORTSTRUKTUR SOM RDS EDITOR ---
         const updateItem = {
             GUID: target.guid,
             modelId: target.modelId,
             runtimeId: target.runtimeId,
-            egenskaperSomSkalEndres: plannedChanges
+            gammelRdsTag: target.gammelRdsTag || "",
+            egenskaperSomSkalEndres: flatChanges,       // For bakoverkompatibilitet med Python-scriptet
+            egenskaperMedPset: structuredChanges        // Ekstra parameter for fremtidig bruk hvis ønskelig
         };
         
         EXPORT_QUEUE.push(updateItem);
@@ -452,17 +491,18 @@ $('queueBtn').addEventListener('click', () => {
     inputs.forEach(inp => {
         if(inp.value !== inp.getAttribute('data-original') && inp.value !== "") {
             inp.style.backgroundColor = "var(--green-dim)";
-            setTimeout(() => { inp.style.backgroundColor = ""; }, 1000);
+            inp.style.borderColor = "var(--green)";
+            setTimeout(() => { inp.style.backgroundColor = ""; inp.style.borderColor = "var(--border)"; }, 1200);
         }
     });
 
-    setStatus(`✅ Lagret endringer for ${currentSelectionTargets.length} objekter i eksport-køen.`, 'ok');
+    setStatus(`Lagt til ${currentSelectionTargets.length} objekter i kø`, 'ok');
 });
 
 $('clearBtn').addEventListener('click', () => {
     EXPORT_QUEUE = [];
     oppdaterUI();
-    setStatus('🗑️ Køen er tømt.', 'ok');
+    setStatus('Køen er tømt', 'warn');
 });
 
 $('exportBtn').addEventListener('click', () => {
@@ -472,15 +512,16 @@ $('exportBtn').addEventListener('click', () => {
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = `property_batch_update.json`;
+        a.href = url; 
+        a.download = `update-properties.json`; // Navnet matcher nå RDS-editoren
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         
         const antallEksportert = EXPORT_QUEUE.length;
         EXPORT_QUEUE = [];
         oppdaterUI();
         
-        setStatus(`🎉 Eksporterte JSON med endringer for ${antallEksportert} objekter. Køen er tømt.`, 'ok');
-    } catch (error) { setStatus(`❌ Feil under eksport: ${error.message}`, 'error'); }
+        setStatus(`Eksporterte ${antallEksportert} oppdateringer`, 'ok');
+    } catch (error) { setStatus(`Feil under eksport`, 'error'); }
 });
 
 connect();
