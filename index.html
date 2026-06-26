@@ -2,7 +2,7 @@
 <html lang="nb">
 <head>
   <meta charset="UTF-8"/>
-  <title>Live Property Editor v1.2</title>
+  <title>Live Property Editor v1.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   
   <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
@@ -116,11 +116,10 @@
 
 <header class="topbar">
   <div class="logo-card">
-    <!-- Bruker lokalt bilde via relativ bane slik du ba om -->
     <img src="norconsult-logo-black.png" alt="Norconsult">
   </div>
   <div class="app-title">
-    <b>Live Property Editor v1.2</b>
+    <b>Live Property Editor v1.3</b>
     <span>Norconsult Norge</span>
     <em>Developed by Norconsult, AI-assisted development. Kontaktperson: Vidar.Metveit@norconsult.com</em>
   </div>
@@ -200,6 +199,49 @@ function getSelectionSignature(selectionArray) {
     return Array.from(safeSet).sort().join(',');
 }
 
+// --- NY OG FORBEDRET ID-JEGER FRA RDS-EDITOREN ---
+function extractGuid(obj) {
+    // 1. Sjekk alle Psets
+    if (obj.properties) {
+        for (const pset of obj.properties) {
+            for (const p of (pset.properties || [])) {
+                if (!p.name || p.value === undefined || p.value === null) continue;
+                
+                const valStr = String(p.value).trim();
+                
+                // Sjekk om verdien inneholder "id. " slik som i bildet ditt
+                if (valStr.startsWith("id. ")) {
+                    return valStr.replace("id. ", "");
+                }
+                
+                // Sjekk om navnet er eksplisitt GUID
+                const nameLower = String(p.name).trim().toLowerCase();
+                if (nameLower === "guid (ifc)" || nameLower === "guid (ms)" || nameLower === "globalid" || nameLower === "ifcguid" || nameLower === "guid") {
+                    return valStr; 
+                }
+            }
+        }
+    }
+    
+    // 2. Standard Trimble Connect attributter
+    if (obj.externalId && obj.externalId !== "UKJENT_GUID") return String(obj.externalId);
+    if (obj.globalId && obj.globalId !== "UKJENT_GUID") return String(obj.globalId);
+    if (obj.ifcGuid && obj.ifcGuid !== "UKJENT_GUID") return String(obj.ifcGuid);
+    if (obj.guid && obj.guid !== "UKJENT_GUID") return String(obj.guid);
+
+    // 3. Ekstrem regex-jakt
+    try {
+        const jsonStr = JSON.stringify(obj);
+        const ifcGuidMatch = jsonStr.match(/([a-zA-Z0-9_$]{22})/);
+        if (ifcGuidMatch) return ifcGuidMatch[1];
+        
+        const normalGuidMatch = jsonStr.match(/([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})/);
+        if (normalGuidMatch) return normalGuidMatch[1];
+    } catch(e) {}
+    
+    return "UKJENT_GUID";
+}
+
 async function connect(){
   try {
     API = await window.TrimbleConnectWorkspace.connect(window.parent);
@@ -262,11 +304,8 @@ async function handleSelection(selection) {
             propsArr.forEach((obj, idx) => {
                 const rid = obj.id || obj.objectRuntimeId || sel.objectRuntimeIds[idx];
                 
-                // --- SAMME IDENTIFIKATOR-LOGIKK SOM RDS EDITOR ---
-                let globalId = "UKJENT_GUID";
-                if (obj.externalId) globalId = obj.externalId;
-                else if (obj.globalId) globalId = obj.globalId;
-                else if (obj.ifcGuid) globalId = obj.ifcGuid;
+                // --- BRUKER NY ID-JEGER ---
+                const globalId = extractGuid(obj);
 
                 let gammelRdsTag = "";
 
@@ -280,15 +319,6 @@ async function handleSelection(selection) {
                                 // Hent gammel RDS-tag i tilfelle Python-scriptet krever det
                                 if (nameLower === "01. rds-tag") {
                                     gammelRdsTag = valStr;
-                                }
-
-                                // Ekstra sjekk for GUID inni properties
-                                if (nameLower.includes("guid") || nameLower.includes("globalid") || nameLower === "objid") {
-                                    if (nameLower.includes("ifc") || nameLower === "globalid" || nameLower === "objid") {
-                                        globalId = valStr;
-                                    } else if (globalId === "UKJENT_GUID") {
-                                        globalId = valStr;
-                                    }
                                 }
                             }
                         });
