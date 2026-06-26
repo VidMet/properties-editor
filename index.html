@@ -201,8 +201,19 @@ function getSelectionSignature(selectionArray) {
 
 // --- NY OG FORBEDRET ID-JEGER FRA RDS-EDITOREN ---
 function extractGuid(obj) {
-    // 1. Sjekk alle Psets
     if (obj.properties) {
+        // 1. PRIORITET: Sjekk eksplisitt under "9_Dummy"
+        const dummyPset = obj.properties.find(pset => pset.name && pset.name.trim().toLowerCase() === "9_dummy");
+        if (dummyPset && dummyPset.properties) {
+            for (const p of dummyPset.properties) {
+                if (p.name && p.name.trim().toLowerCase() === "guid" && p.value !== undefined && p.value !== null) {
+                    const valStr = String(p.value).trim();
+                    if (valStr !== "") return valStr;
+                }
+            }
+        }
+
+        // 2. PRIORITET: Sjekk alle andre Psets (inkludert "id. " logikken og andre GUID-navn)
         for (const pset of obj.properties) {
             for (const p of (pset.properties || [])) {
                 if (!p.name || p.value === undefined || p.value === null) continue;
@@ -223,13 +234,13 @@ function extractGuid(obj) {
         }
     }
     
-    // 2. Standard Trimble Connect attributter
+    // 3. PRIORITET: Standard Trimble Connect attributter
     if (obj.externalId && obj.externalId !== "UKJENT_GUID") return String(obj.externalId);
     if (obj.globalId && obj.globalId !== "UKJENT_GUID") return String(obj.globalId);
     if (obj.ifcGuid && obj.ifcGuid !== "UKJENT_GUID") return String(obj.ifcGuid);
     if (obj.guid && obj.guid !== "UKJENT_GUID") return String(obj.guid);
 
-    // 3. Ekstrem regex-jakt
+    // 4. PRIORITET: Ekstrem regex-jakt
     try {
         const jsonStr = JSON.stringify(obj);
         const ifcGuidMatch = jsonStr.match(/([a-zA-Z0-9_$]{22})/);
